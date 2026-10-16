@@ -2,10 +2,14 @@ import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 const API = "/api";
+const COLUMNS = [
+  { key: "TODO", label: "To Do" },
+  { key: "IN_PROGRESS", label: "In Progress" },
+  { key: "DONE", label: "Done" },
+];
 function App() {
   const [tasks, setTasks] = useState([]),
     [stats, setStats] = useState({ total: 0, todo: 0, inProgress: 0, done: 0 }),
-    [filter, setFilter] = useState("ALL"),
     [showForm, setShowForm] = useState(false),
     [loading, setLoading] = useState(true),
     [error, setError] = useState("");
@@ -28,8 +32,6 @@ function App() {
   useEffect(() => {
     load();
   }, []);
-  const visible =
-    filter === "ALL" ? tasks : tasks.filter((t) => t.status === filter);
   const update = async (t) => {
     const next =
       t.status === "TODO"
@@ -46,7 +48,8 @@ function App() {
   };
   const create = async (e) => {
     e.preventDefault();
-    const f = new FormData(e.currentTarget);
+    const form = e.currentTarget;
+    const f = new FormData(form);
     await fetch(`${API}/tasks`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -58,151 +61,78 @@ function App() {
         status: "TODO",
       }),
     });
-    e.currentTarget.reset();
+    form.reset();
     setShowForm(false);
     load();
   };
+  const grouped = COLUMNS.reduce((acc, c) => {
+    acc[c.key] = tasks.filter((t) => t.status === c.key);
+    return acc;
+  }, {});
   return (
     <div className="app">
-      <aside className="sidebar">
+      <header className="topbar">
         <div className="brand">
           <span className="brand-mark">T</span>
-          <div>
-            <b>TaskBoard</b>
-            <small>DevOps Capstone</small>
-          </div>
+          <b>TaskBoard</b>
         </div>
-        <nav>
-          <a className="active">
-            ▦ <span>Dashboard</span>
-          </a>
-          <a>
-            ✓ <span>My Tasks</span>
-          </a>
-          <a>
-            ◫ <span>Projects</span>
-          </a>
-          <a>
-            ◌ <span>Activity</span>
-          </a>
+        <nav className="toplinks">
+          <a className="active">Board</a>
+          <a>My Tasks</a>
+          <a>Projects</a>
+          <a>Reports</a>
         </nav>
-        <div className="side-bottom">
-          <div className="upgrade">
-            <strong>Ship with confidence.</strong>
-            <p>Build, deploy and observe your application.</p>
-          </div>
-          <div className="profile">
-            <div className="avatar">US</div>
-            <div>
-              <b>Ujjwal Sahu</b>
-              <small>Developer</small>
-            </div>
-            <span>⋮</span>
-          </div>
-        </div>
-      </aside>
-      <main className="main">
-        <header>
-          <div>
-            <p className="eyebrow">WORKSPACE / OVERVIEW</p>
-            <h1>Good morning, UJJWAL 👋</h1>
-            <p className="muted">
-              Here’s what’s happening with your team today.
-            </p>
-          </div>
+        <div className="topbar-right">
           <button className="primary" onClick={() => setShowForm(true)}>
-            ＋ New task
+            + New task
           </button>
-        </header>
+          <div className="avatar">US</div>
+        </div>
+      </header>
+      <main className="main">
+        <section className="hero">
+          <p className="eyebrow">WORKSPACE / OVERVIEW</p>
+          <h1>Good morning, Ujjwal</h1>
+          <p className="muted">
+            Here’s what’s happening with your team today.
+          </p>
+        </section>
         {error && (
           <div className="alert">
             ⚠ {error}. Start the backend and PostgreSQL, then refresh.
           </div>
         )}
-        <section className="stats">
-          <Stat label="Total tasks" value={stats.total} icon="▦" />
+        <section className="stats-row">
+          <Stat label="Total tasks" value={stats.total} icon="◆" />
           <Stat label="To do" value={stats.todo} icon="○" />
           <Stat label="In progress" value={stats.inProgress} icon="◔" />
           <Stat label="Completed" value={stats.done} icon="✓" />
         </section>
-        <section className="content-grid">
-          <div className="panel tasks-panel">
-            <div className="panel-head">
-              <div>
-                <h2>Tasks</h2>
-                <p className="muted">Track work across the product team.</p>
+        <section className="workspace">
+          <div className="board">
+            {COLUMNS.map((c) => (
+              <div className="column" key={c.key}>
+                <div className="column-head">
+                  <span className={`col-dot ${c.key.toLowerCase()}`}></span>
+                  <h3>{c.label}</h3>
+                  <span className="count">{grouped[c.key]?.length || 0}</span>
+                </div>
+                <div className="column-body">
+                  {loading ? (
+                    <div className="empty">Loading…</div>
+                  ) : (
+                    <>
+                      {(grouped[c.key] || []).map((t) => (
+                        <TaskCard key={t.id} t={t} onAdvance={update} />
+                      ))}
+                      {!(grouped[c.key] || []).length && (
+                        <div className="empty">No tasks here.</div>
+                      )}
+                    </>
+                  )}
+                </div>
               </div>
-              <div className="filters">
-                {["ALL", "TODO", "IN_PROGRESS", "DONE"].map((x) => (
-                  <button
-                    className={filter === x ? "selected" : ""}
-                    onClick={() => setFilter(x)}
-                    key={x}
-                  >
-                    {x === "ALL" ? "All" : x.replace("_", " ")}
-                  </button>
-                ))}
-              </div>
-            </div>
-            {loading ? (
-              <div className="empty">Loading tasks…</div>
-            ) : (
-              <div className="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Task</th>
-                      <th>Assignee</th>
-                      <th>Priority</th>
-                      <th>Status</th>
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {visible.map((t) => (
-                      <tr key={t.id}>
-                        <td>
-                          <div className="task-title">
-                            <span
-                              className={`dot ${t.status.toLowerCase()}`}
-                            ></span>
-                            <div>
-                              <b>{t.title}</b>
-                              <small>{t.description}</small>
-                            </div>
-                          </div>
-                        </td>
-                        <td>{t.assignee}</td>
-                        <td>
-                          <span
-                            className={`priority ${t.priority.toLowerCase()}`}
-                          >
-                            {t.priority}
-                          </span>
-                        </td>
-                        <td>
-                          <span className={`status ${t.status.toLowerCase()}`}>
-                            {t.status.replace("_", " ")}
-                          </span>
-                        </td>
-                        <td>
-                          <button
-                            className="icon-btn"
-                            onClick={() => update(t)}
-                            title="Advance status"
-                          >
-                            ↻
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {!visible.length && (
-                  <div className="empty">No tasks in this filter.</div>
-                )}
-              </div>
-            )}
+            ))}
           </div>
           <aside className="panel activity">
             <div className="panel-head">
@@ -284,7 +214,7 @@ function App() {
                 </label>
                 <label>
                   Assignee
-                  <input name="assignee" defaultValue="Nensi Ravaliya" />
+                  <input name="assignee" defaultValue="Ujjwal" />
                 </label>
               </div>
               <button className="primary full">Create task</button>
@@ -303,6 +233,39 @@ function Stat({ label, value, icon }) {
         <small>{label}</small>
         <strong>{value}</strong>
         <span>Updated just now</span>
+      </div>
+    </div>
+  );
+}
+function TaskCard({ t, onAdvance }) {
+  const initials = (t.assignee || "?")
+    .split(" ")
+    .map((p) => p[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+  return (
+    <div className="task-card">
+      <div className="task-card-top">
+        <span className={`dot ${t.status.toLowerCase()}`}></span>
+        <span className={`priority ${t.priority.toLowerCase()}`}>
+          {t.priority}
+        </span>
+      </div>
+      <b className="task-card-title">{t.title}</b>
+      {t.description && <p className="task-card-desc">{t.description}</p>}
+      <div className="task-card-foot">
+        <div className="task-assignee">
+          <span className="mini-avatar">{initials}</span>
+          <small>{t.assignee}</small>
+        </div>
+        <button
+          className="icon-btn"
+          onClick={() => onAdvance(t)}
+          title="Advance status"
+        >
+          ↻
+        </button>
       </div>
     </div>
   );
